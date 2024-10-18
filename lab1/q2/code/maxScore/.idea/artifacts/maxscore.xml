@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="maxscore">
+    <output-path>/opt/code/jars</output-path>
+    <root id="archive" name="maxscore.jar">
+      <element id="module-output" name="maxScore" />
+    </root>
+  </artifact>
+</component>

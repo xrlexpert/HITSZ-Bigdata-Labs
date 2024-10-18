@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="visitcount">
+    <output-path>/opt/code/jars</output-path>
+    <root id="archive" name="visitcount.jar">
+      <element id="module-output" name="visitCount" />
+    </root>
+  </artifact>
+</component>
