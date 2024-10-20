@@ -181,6 +181,30 @@ def split_train_val(X, y, ratio=0.8, seed=42):
     X_val, y_val = X[split:], y[split:]
     return X_train, y_train, X_val, y_val
 
+
+
+def save_test_results_to_csv(X_test, y_test, cart, file_name='test_results.csv'):
+    """
+    将测试集的预测结果和真实标签保存到CSV文件中
+    :param X_test: 测试集特征
+    :param y_test: 测试集真实标签
+    :param cart: 已训练的决策树模型
+    :param file_name: 保存结果的CSV文件名
+    :return: None
+    """
+    predictions = []
+    for i in range(X_test.shape[0]):
+        pred = cart.predict(X_test[i])
+        predictions.append((X_test[i], y_test[i], pred))  # 保存特征，真实标签和预测结果
+
+    # 转换为DataFrame保存
+    df = pd.DataFrame(predictions, columns=['Features', 'True Label', 'Predicted Label'])
+    df.to_csv(file_name, index=False)
+    print(f"Results saved to {file_name}")
+
+
+
+
 if __name__ == "__main__":
     data = np.loadtxt('./data/train_adult_pro.csv', delimiter=',', skiprows=1)
     X,y = data[:,:-1], data[:,-1]
@@ -228,4 +252,7 @@ if __name__ == "__main__":
         if(cart.predict(X_test[i]) == y_test[i]):
             cnt += 1
     print(f"after prune: test on test data:{cnt/X_test.shape[0]}")
+
     save_decision_tree(cart)
+
+    save_test_results_to_csv(X_test, y_test, cart, file_name='./res/test_results.csv')
