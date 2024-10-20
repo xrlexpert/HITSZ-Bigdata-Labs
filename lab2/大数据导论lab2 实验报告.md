@@ -212,7 +212,7 @@ import pandas as pd
 import random
 cart_config = { 
     'max_depth': 10,  
-    'min_samples_split': 1,  
+    'min_samples_split': 2,  
     'min_gini': 0.02
 }
 unused_splits = set()  # 记录已经使用过的切分点，避免重复使用
@@ -334,6 +334,7 @@ def load_decision_tree():
     
     cart = np.load('cart.npy', allow_pickle=True)
     return cart.item()
+
 ```
 
 **训练集和验证集划分**
@@ -373,7 +374,7 @@ def split_train_val(X, y, ratio=0.8, seed=42):
 ```python
 cart_config = { 
     'max_depth': 10,  
-    'min_samples_split': 1,  
+    'min_samples_split': 2,  
     'min_gini': 0.02
 }
 ```
@@ -456,6 +457,12 @@ def prune_tree(node, X_val, y_val):
 * 表明剪枝起了效果
 
 对比sklearn结果：
+
+参数设置
+
+```python
+clf = DecisionTreeClassifier(max_depth=10, random_state=42, criterion='gini', splitter='best',min_samples_split=2)
+```
 
 * sklearn在测试集准确率:0.8289455060155697
 
