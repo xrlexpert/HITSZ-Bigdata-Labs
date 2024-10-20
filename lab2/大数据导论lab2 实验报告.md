@@ -167,7 +167,7 @@
 
 ## 决策树算法
 
-决策树算法选择：CART
+决策树算法选择：**CART**
 
 1. **问题假设**：
 
@@ -205,8 +205,6 @@
 
 6. **继续递归**：  
    根据选中的 $C_{\text{best}}, V_{best}$ 将数据集划分为子集，并递归执行以上步骤，直到满足终止条件。
-
-* 为了以防决策树过拟合，这里参数设置最大深度为10，节点样本数量最少为1，节点内基尼系数最小为0.02
 
 ```python
 import numpy as np
@@ -336,45 +334,131 @@ def load_decision_tree():
     
     cart = np.load('cart.npy', allow_pickle=True)
     return cart.item()
+```
 
+**训练集和验证集划分**
 
-if __name__ == "__main__":
-    train_data = np.loadtxt('train_adult_pro.csv', delimiter=',', skiprows=1)
-    X,y = train_data[:,:-1],train_data[:,-1]
+```python
+def split_train_val(X, y, ratio=0.8, seed=42):
+    """
+    划分训练集和验证集
+    :param X: 特征
+    :param y: 标签
+    :param ratio: 训练集比例
+    :return: X_train, y_train, X_val, y_val
+    """
+    np.random.seed(seed)
+    n = X.shape[0]
     y = y.astype(int)
-    for i in range(X.shape[0]):
-        for j in range(X.shape[1]):
-            if((j,X[i][j]) in unused_splits):
-                continue
-            else:
-                unused_splits.add((j,int(X[i][j])))
-    cart = build_decision_tree(X, y, 0, unused_splits)
-    save_decision_tree(cart)
-    cart = load_decision_tree()
+    indices = np.arange(n)
+    np.random.shuffle(indices)
+    X, y = X[indices], y[indices]
+    split = int(n * ratio)
+    X_train, y_train = X[:split], y[:split]
+    X_val, y_val = X[split:], y[split:]
+    return X_train, y_train, X_val, y_val
+```
+
+* 本次实验采用经典的将train_data按照8:2分为训练集和验证集
+* **note**:为了简化算法空间复杂度以及实现过程，这里将可能的特征分割点提前计算出来，并在构建树的时候**不会**随着树的构建一步步剔除。意思就每次计算geni系数时，都是所有的特征再算一次。由于每次都是取最好的，所以不会对算法的最优性造成影响，只是会增加算法的部分时间。
+
+## 前剪枝
+
+为了以防决策树过拟合，参数设置：
+
+* 最大深度为10
+* 节点分割最少样本数量最少为2
+* 节点内基尼系数最小为0.02
+
+```python
+cart_config = { 
+    'max_depth': 10,  
+    'min_samples_split': 1,  
+    'min_gini': 0.02
+}
+```
+
+
+
+## 后剪枝
+
+在训练集上训练好后，我们对决策树在验证集上做后剪枝
+
+```python
+def prune_tree(node, X_val, y_val):
+    """
+    对树进行后剪枝
+    :param node: 当前节点
+    :param X_val: 验证集特征
+    :param y_val: 验证集标签
+    :return: 剪枝后的节点
+    """
+    if y_val.shape[0] == 0:
+        return node
+    if node.label is not None:
+        return node
+
+    # 对左右子树进行递归剪枝
+    if node.left:
+        node.left = prune_tree(node.left, X_val[X_val[:, node.feature_index] == node.feature_value], y_val[X_val[:, node.feature_index] == node.feature_value])
+    if node.right:
+        node.right = prune_tree(node.right, X_val[X_val[:, node.feature_index] != node.feature_value], y_val[X_val[:, node.feature_index] != node.feature_value])
+
+    # 评估当前节点是否需要剪枝
+    if node.left is not None and node.right is not None:
+        # 如果左右子节点都是叶子节点，则考虑剪枝
+        if node.left.label is not None and node.right.label is not None:
+            # 剪枝前后的准确率比较
+            left_right_preds = np.where(X_val[:, node.feature_index] == node.feature_value, node.left.label, node.right.label)
+            before_prune_acc = np.mean(left_right_preds == y_val)
+
+            # 剪枝，直接将当前节点作为叶子节点
+            node_preds = np.full(X_val.shape[0], np.argmax(np.bincount(y_val)))
+            after_prune_acc = np.mean(node_preds == y_val)
+
+            if after_prune_acc >= before_prune_acc:
+                # 如果剪枝后准确率没有下降，则进行剪枝
+                node = Node(None, None, None, None, np.argmax(np.bincount(y_val)))
+
+    return node
+```
+
+
+
+```python
+ cart = build_decision_tree(X_train, y_train, 0, unused_splits)
     cnt = 0
-    test_data = np.loadtxt('test_adult_pro.csv', delimiter=',', skiprows=1)
-    for i in range(X.shape[0]):
-        if(cart.predict(X[i]) == y[i]):
+    for i in range(X_val.shape[0]):
+        if(cart.predict(X_val[i]) == y_val[i]):
             cnt += 1
-    print(f"test on train data:{cnt/X.shape[0]}")
+    print(f"before prune: test on val data:{cnt/X_val.shape[0]}")
+    
+    # 后剪枝
+    cart = prune_tree(cart, X_val, y_val)
+
     cnt = 0
-    X_test, y_test =  test_data[:,:-1],test_data[:,-1]
-    y_test = y_test.astype(int)
-    for i in range(X_test.shape[0]):
-        if(cart.predict(X_test[i]) == y_test[i]):
+    for i in range(X_val.shape[0]):
+        if(cart.predict(X_val[i]) == y_val[i]):
             cnt += 1
-    print(f"test on test data:{cnt/X_test.shape[0]}")
+    print(f"before prune: test on val data:{cnt/X_val.shape[0]}")
 
 ```
 
+
+
 ## 测试结果以及准确率
 
-* 训练集上准确率：0.8361953612845674
-* 测试集上准确率：0.8305024769992922
+* 不进行后剪枝在测试集准确率：0.8305024769992922
+* 进行后剪枝在测试集准确率：0.8316348195329087
 
-![image-20241020110903963](C:\Users\HiroX\AppData\Roaming\Typora\typora-user-images\image-20241020110903963.png)
+![image-20241020143319238](C:\Users\HiroX\AppData\Roaming\Typora\typora-user-images\image-20241020143319238.png)
+
+* 表明剪枝起了效果
 
 对比sklearn结果：
 
-![image-20241020111026556](C:\Users\HiroX\AppData\Roaming\Typora\typora-user-images\image-20241020111026556.png)
+* sklearn在测试集准确率:0.8289455060155697
 
+![image-20241020143839243](C:\Users\HiroX\AppData\Roaming\Typora\typora-user-images\image-20241020143839243.png)
+
+>  还比sklearn更优？:)
