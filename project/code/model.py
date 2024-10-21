@@ -40,7 +40,7 @@ y = data[:,-1]
 
 X_train, y_train, X_val, y_val = split_train_val(X, y, config.get('ratio'), seed=config.get('seed'))
 #choose the best model
-xgb_model = XGBRegressor(learning_rate=0.015,n_estimators=4750,max_depth=3,min_child_weight=0,subsample=0.7,colsample_bytree=0.4064,nthread=-1,scale_pos_weight=2,seed=42)
+xgb_model = XGBRegressor(learning_rate=0.0156,n_estimators=4750,max_depth=3,min_child_weight=0,subsample=0.7,colsample_bytree=0.4064,nthread=-1,scale_pos_weight=2,seed=42)
 xgb_model.fit(X_train,y_train, eval_set = [(X_val,y_val)])
 
 
